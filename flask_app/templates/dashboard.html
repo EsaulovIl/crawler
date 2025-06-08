@@ -14,7 +14,26 @@
 <main class="main-content">
     <!-- Раздел с фильтрами -->
     <section class="filters-section">
-        <!-- Пока пусто -->
+        <form id="filters" class="filters-container">
+            <label>Период:
+                <input type="date" id="startDate"> —
+                <input type="date" id="endDate">
+            </label>
+
+            <label>Организатор:
+                <select id="organizerSelect">
+                    <option value="">Все</option>
+                </select>
+            </label>
+
+            <label>Тип мероприятия:
+                <select id="typeSelect">
+                    <option value="">Все</option>
+                </select>
+            </label>
+
+            <button type="submit">Применить</button>
+        </form>
     </section>
     <section class="chart-section">
         <h2 class="chart-title">Распределение мероприятий по типам</h2>
@@ -24,6 +43,7 @@
     </section>
 </main>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/filters.js') }}"></script>
 </body>
 </html>

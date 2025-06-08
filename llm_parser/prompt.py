@@ -1,4 +1,4 @@
-from .utils import chunk_text
+from .utils import extract_main_content, extract_metadata, select_relevant_paragraphs, chunk_paragraphs
 
 EVENT_PROMPT_TEMPLATE = """
     Ты — эксперт по извлечению структурированной информации из текста. 
@@ -39,12 +39,28 @@ EVENT_PROMPT_TEMPLATE = """
     Тип мероприятия: "Конференция"
     Формат проведения: "Очный"
     
-    Вот текст страницы:
-    {text}
+    ---  
+    Теперь текст страницы:
+    Title: {title}  
+    Description: {description}  
+
+    {body}
     """
 
 
-def build_event_prompt(text: str, url: str) -> str:
-    # Первый вариант предобработки текста
-    snippet = chunk_text(text, max_length=14000)
-    return EVENT_PROMPT_TEMPLATE.format(text=snippet, url=url)
+def build_event_prompt(html: str, url: str) -> str:
+    # Извлекаем мета
+    meta = extract_metadata(html)
+    # Извлекаем основной чистый текст
+    main = extract_main_content(html)
+    # Отбираем нужные абзацы
+    keywords = ['дата', 'организатор', 'пройдет', 'проходит', 'мероприятие']
+    paras = select_relevant_paragraphs(main, keywords, max_paras=15)
+    # Склеиваем в не слишком длинный чанк
+    body_snippet = chunk_paragraphs(paras, max_length=12000)
+
+    return EVENT_PROMPT_TEMPLATE.format(
+        title=meta['title'] or 'Не указано',
+        description=meta['description'] or 'Не указано',
+        body=body_snippet
+    )
