@@ -1,6 +1,6 @@
 import logging
 import requests
-from crawler.search import google_search
+from crawler.it_events_crawler.search import google_search
 from llm_parser.utils import clean_html
 from llm_parser import extract_event_info
 
