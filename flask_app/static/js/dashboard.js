@@ -15,18 +15,43 @@ const baseColors = [
 function getColorsForData(n) {
   const colors = [];
   for (let i = 0; i < n; i++) {
-    // Циклично возвращаем цвет из baseColors
     colors.push(baseColors[i % baseColors.length]);
   }
   return colors;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  // Получаем контекст canvas
-  const ctx = document.getElementById('pieChart').getContext('2d');
+document.addEventListener('DOMContentLoaded', () => {
 
-  // Инициализируем пустой Chart.js
-  const chart = new Chart(ctx, {
+  // Контексты для дашборда
+  const totalEl = document.getElementById('totalCount');
+  const lineCtx   = document.getElementById('lineChart').getContext('2d');
+  const typeCtx   = document.getElementById('pieChart').getContext('2d');
+  const formatCtx = document.getElementById('formatChart').getContext('2d');
+
+  // Линейный график «Событий во времени»
+  const lineChart = new Chart(lineCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Событий',
+        data: [],
+        borderColor: baseColors[0],
+        backgroundColor: 'transparent',
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: 'Дата' } },
+        y: { title: { display: true, text: 'Количество' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Круговая диаграмма «Доля типов мероприятий»
+  const typeChart = new Chart(typeCtx, {
     type: 'pie',
     data: {
       labels: [],
@@ -49,47 +74,84 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         },
         tooltip: {
-          enabled: true,
           callbacks: {
-            label: context => {
-              const label = context.label || '';
-              const value = context.parsed || 0;
-              return `${label}: ${value}`;
-            }
+            label: context => `${context.label}: ${context.parsed}`
           }
         }
       }
     }
   });
 
-  // Функция загрузки данных и обновления графика
-  function updateChart(params = new URLSearchParams()) {
-    fetch(`/api/events_by_type?${params.toString()}`)
-      .then(response => response.json())
-      .then(data => {
-        if (!Array.isArray(data) || data.length === 0) {
-          console.warn('Нет данных для отображения pie chart');
-          chart.data.labels = [];
-          chart.data.datasets[0].data = [];
-          chart.data.datasets[0].backgroundColor = [];
-          return chart.update();
-        }
-        const labels   = data.map(item => item.event_type);
-        const counts   = data.map(item => item.count);
-        const colors   = getColorsForData(labels.length);
+  // Круговая диаграмма «Доля форматов проведения»
+  const formatChart = new Chart(formatCtx, {
+    type: 'pie',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        backgroundColor: [],
+        borderColor: 'rgba(255, 255, 255, 0.8)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
 
-        chart.data.labels = labels;
-        chart.data.datasets[0].data            = counts;
-        chart.data.datasets[0].backgroundColor = colors;
-        chart.update();
+  // Функция обновления всех виджетов
+  function updateAll(params = new URLSearchParams()) {
+    const qs = params.toString() ? `?${params}` : '';
+
+    // Общее количество
+    fetch(`/api/events_summary${qs}`)
+      .then(r => r.json())
+      .then(d => { totalEl.textContent = d.total; })
+      .catch(err => console.error('Summary error:', err));
+
+    // Динамика событий во времени
+    fetch(`/api/events_over_time${qs}`)
+      .then(r => r.json())
+      .then(arr => {
+        const labels = arr.map(o => o.period);
+        const data   = arr.map(o => o.count);
+        lineChart.data.labels           = labels;
+        lineChart.data.datasets[0].data = data;
+        lineChart.update();
       })
-      .catch(err => console.error('Ошибка при получении данных для графика:', err));
+      .catch(err => console.error('Trend error:', err));
+
+    // Доля типов мероприятий
+    fetch(`/api/events_by_type${qs}`)
+      .then(r => r.json())
+      .then(arr => {
+        const labels = arr.map(o => o.event_type);
+        const data   = arr.map(o => o.count);
+        typeChart.data.labels                   = labels;
+        typeChart.data.datasets[0].data         = data;
+        typeChart.data.datasets[0].backgroundColor = getColorsForData(labels.length);
+        typeChart.update();
+      })
+      .catch(err => console.error('Type pie error:', err));
+
+    // Доля форматов проведения
+    fetch(`/api/events_by_format${qs}`)
+      .then(r => r.json())
+      .then(arr => {
+        const labels = arr.map(o => o.format);
+        const data   = arr.map(o => o.count);
+        formatChart.data.labels                   = labels;
+        formatChart.data.datasets[0].data         = data;
+        formatChart.data.datasets[0].backgroundColor = getColorsForData(labels.length);
+        formatChart.update();
+      })
+      .catch(err => console.error('Format pie error:', err));
   }
 
-  // Инициализируем фильтры, передав updateChart как коллбэк
-  initFilters({ onApply: updateChart });
+  // Подключаем фильтры
+  initFilters({ onApply: updateAll });
 
-  // Первичный рендер без фильтров
-  updateChart();
-
+  // Первичная отрисовка без фильтров
+  updateAll();
 });

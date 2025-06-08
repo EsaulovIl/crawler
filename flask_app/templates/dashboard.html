@@ -12,6 +12,7 @@
 </header>
 
 <main class="main-content">
+
     <!-- Раздел с фильтрами -->
     <section class="filters-section">
         <form id="filters" class="filters-container">
@@ -35,6 +36,30 @@
             <button type="submit">Применить</button>
         </form>
     </section>
+
+    <!-- Общее количество -->
+    <section class="summary-section">
+        <h2>Всего ИТ-мероприятий</h2>
+        <div class="summary-value" id="totalCount">–</div>
+    </section>
+
+    <!-- Линейный график событий во времени -->
+    <section class="trend-section">
+        <h2>Событий во времени</h2>
+        <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+        </div>
+    </section>
+
+    <!-- Круговая диаграмма форматов -->
+    <section class="format-section">
+        <h2>Доля форматов проведения</h2>
+        <div class="chart-container">
+            <canvas id="formatChart"></canvas>
+        </div>
+    </section>
+
+    <!-- Круговая диаграмма типов мероприятий -->
     <section class="chart-section">
         <h2 class="chart-title">Распределение мероприятий по типам</h2>
         <div class="chart-container">
