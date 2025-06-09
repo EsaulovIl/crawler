@@ -1,12 +1,13 @@
 import re
 from .schema import EventData
-from .exceptions import LLMParseError
+from it_events_crawler.exceptions import LLMParseError
 
 # соответствие заголовков в ответе полям EventData
 FIELD_MAP = {
     'Название ИТ-мероприятия': 'title',
     'Организатор': 'organizer',
-    'Даты проведения': 'dates',
+    'Дата начала': 'start_date',
+    'Даты окончания': 'end_date',
     'Тип мероприятия': 'event_type',
     'Формат проведения': 'event_format',
 }
@@ -35,4 +36,4 @@ def parse_llm_response(raw: str, url: str) -> dict:
     except Exception as e:
         raise LLMParseError(f"Failed to validate LLM response: {e}")
 
-    return event.model_dump()
+    return event.model_dump(mode = "json")

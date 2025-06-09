@@ -4,7 +4,8 @@ from pydantic import BaseModel, HttpUrl, field_validator
 class EventData(BaseModel):
     title: str
     organizer: str
-    dates: str
+    start_date: str
+    end_date: str
     event_type: str
     event_format: str
     url: HttpUrl

@@ -1,7 +1,7 @@
 import requests
 
 
-def google_search(query: str, api_key, cx, num_results: int = 5) -> list[str]:
+def google_search(query: str, api_key, cx, num_results: int = 2) -> list[str]:
     """
     Возвращает список URL’ов по запросу через Custom Search JSON API.
     """

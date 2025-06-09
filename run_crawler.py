@@ -1,8 +1,8 @@
 import logging
 import requests
 from crawler.it_events_crawler.search import google_search
-from llm_parser.utils import clean_html
-from llm_parser import extract_event_info
+from crawler.it_events_crawler.llm_parser import clean_html
+from crawler.it_events_crawler.llm_parser import extract_event_info
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
