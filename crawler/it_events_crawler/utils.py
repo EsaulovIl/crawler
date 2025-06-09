@@ -20,8 +20,9 @@ RE_GARBAGE_LINE = re.compile(
 
 
 def _sanitize_soup(soup: BeautifulSoup) -> BeautifulSoup:
-    """Удаляем тех-теги, комментарии, <header>/<footer> и пр."""
-    # <header>/<footer> и role="banner"/"contentinfo"
+    """
+    Удаляем тех-теги, комментарии, <header>/<footer> и пр.
+    """
     for sel in ["header", "footer", '[role="banner"]', '[role="contentinfo"]']:
         for node in soup.select(sel):
             node.decompose()

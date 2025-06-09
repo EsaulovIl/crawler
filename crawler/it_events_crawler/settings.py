@@ -30,8 +30,8 @@ FEEDS = {
         "item_classes": ["it_events_crawler.items.EventItem"],
         "fields": [
             "title", "organizer", "start_date", "end_date",
-            "event_type", "event_format",
-            "url"
+            "event_type", "event_format", "location",
+            "description", "url"
         ],
     },
     # DEBUG файл: приходят очищенные html

@@ -4,7 +4,7 @@ from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
 from it_events_crawler.search import google_search
 from it_events_crawler.items import PageContentItem
-from it_events_crawler.utils import extract_main_content, extract_visible_text
+from it_events_crawler.utils import extract_visible_text
 
 DENY_PATTERNS = [r'/login', r'/signin', r'/register', r'/auth', r'/logout',
                  r'/cart', r'/checkout', r'/wp-admin', r'/wp-login',
@@ -48,8 +48,9 @@ class EventCrawlSpider(CrawlSpider):
 
         # формируем стартовые URL-ы
         spider.start_urls = google_search(
-            spider.query, spider.google_key, spider.cse_id, num_results=2
+            spider.query, spider.google_key, spider.cse_id, num_results=3
         )
+        print(spider.start_urls)
 
         # allowed_domains - все домены из start_urls
         spider.allowed_domains = [

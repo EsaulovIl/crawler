@@ -8,6 +8,8 @@ class EventData(BaseModel):
     end_date: str
     event_type: str
     event_format: str
+    location: str
+    description: str
     url: HttpUrl
 
     @field_validator('*', mode='before')
