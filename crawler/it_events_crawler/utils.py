@@ -15,7 +15,9 @@ NON_CONTENT = re.compile(
 
 RE_GARBAGE_LINE = re.compile(
     r"^(?:share|поделиться|cookies?|facebook|vk\.com|twitter|instagram"
-    r"|©|\d{1,2}\s?[–-]\s?\d{1,2})\b", re.I
+    r"|\d{1,2}\s?[–-]\s?\d{1,2}(?!\s*(январ|феврал|март|апрел|мая|июн|июл|"
+    r"август|сентябр|октябр|ноябр|декабр)))\b",
+    re.I
 )
 
 

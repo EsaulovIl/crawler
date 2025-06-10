@@ -4,3 +4,6 @@ SQLAlchemy
 psycopg2-binary
 flask_sqlalchemy
 Scrapy
+pydantic
+requests
+bs4

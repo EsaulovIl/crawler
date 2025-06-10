@@ -48,8 +48,9 @@ class EventCrawlSpider(CrawlSpider):
 
         # формируем стартовые URL-ы
         spider.start_urls = google_search(
-            spider.query, spider.google_key, spider.cse_id, num_results=3
+            spider.query, spider.google_key, spider.cse_id, num_results=5
         )
+
         print(spider.start_urls)
 
         # allowed_domains - все домены из start_urls
@@ -73,6 +74,7 @@ class EventCrawlSpider(CrawlSpider):
 
     def parse_event(self, response):
         clean = extract_visible_text(response.text)
+        print(response.url)
         print(clean)
         yield PageContentItem(
             url=response.url,
