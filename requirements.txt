@@ -7,3 +7,8 @@ Scrapy
 pydantic
 requests
 bs4
+gigachat
+emoji
+networkx
+fuzzywuzzy
+#python-Levenshtein
