@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from sqlalchemy import func
+from datetime import date
 from .models import Event
 from . import db
 
@@ -33,6 +34,20 @@ def apply_filters(query):
 @bp.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
+
+
+@bp.route("/api/summary")
+def api_summary():
+    today = date.today()
+    total = db.session.query(Event).count()
+    planned = db.session.query(Event).filter(Event.start_date >= today).count()
+    finished = db.session.query(Event).filter(Event.end_date < today).count()
+    return jsonify({
+        "total": total,
+        "planned": planned,
+        "finished": finished,
+        "today": today.strftime("%d %B")
+    })
 
 
 # Общее количество мероприятий

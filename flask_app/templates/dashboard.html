@@ -4,38 +4,82 @@
     <meta charset="UTF-8">
     <title>Дашборд ИТ-мероприятий</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-<header class="header">
-    <h1 class="title">Дашборд ИТ-мероприятий</h1>
+<header class="header-bar">
+    <!-- метрики -->
+    <div class="glass box-metrics">
+        <span class="box-title">Overall</span>
+
+        <div class="kpi">
+            <span class="kpi-label">Запланировано событий</span>
+            <span class="kpi-value" id="kpiPlanned">–</span>
+        </div>
+        <div class="kpi">
+            <span class="kpi-label">Кол-во завершённых мероприятий</span>
+            <span class="kpi-value" id="kpiFinished">–</span>
+        </div>
+    </div>
+
+    <!-- “Сегодня” -->
+    <div class="glass box-today">
+        <span class="kpi-label">Сегодня</span>
+        <span class="kpi-value" id="kpiToday">–</span>
+    </div>
+
+    <!-- кнопки -->
+    <div class="glass box-actions">
+        <button class="btn btn-green">Рассчитать</button>
+        <button class="btn btn-orange">Скачать отчёт</button>
+    </div>
 </header>
+
 
 <main class="main-content">
 
     <!-- Раздел с фильтрами -->
     <section class="filters-section">
-        <form id="filters" class="filters-container">
-            <label>Период:
-                <input type="date" id="startDate"> —
+        <form id="filters" class="filters-box glass">
+            <span class="filter-title">Фильтры</span>
+
+            <!-- ▸ Дата «с – по» ----------------------------------- -->
+            <div class="filter-field date-range">
+                <label>Дата</label>
+                <input type="date" id="startDate">
+                <span class="arrow">›</span>
                 <input type="date" id="endDate">
-            </label>
+            </div>
 
-            <label>Организатор:
-                <select id="organizerSelect">
-                    <option value="">Все</option>
+            <!-- ▸ Тип -------------------------------------------- -->
+            <div class="filter-field">
+                <label for="typeSelect">Тип мероприятия</label>
+                <select id="typeSelect" class="chip-select">
+                    <option value="">Любой</option>
                 </select>
-            </label>
+            </div>
 
-            <label>Тип мероприятия:
-                <select id="typeSelect">
-                    <option value="">Все</option>
+            <!-- ▸ Организатор ------------------------------------ -->
+            <div class="filter-field">
+                <label for="organizerSelect">Организатор</label>
+                <select id="organizerSelect" class="chip-select">
+                    <option value="">Любой</option>
                 </select>
-            </label>
+            </div>
 
-            <button type="submit">Применить</button>
+            <!-- ▸ Формат ----------------------------------------- -->
+            <div class="filter-field">
+                <label for="formatSelect">Формат</label>
+                <select id="formatSelect" class="chip-select">
+                    <option value="">Любой</option>
+                </select>
+            </div>
+
+            <button class="btn btn-green" type="submit">Применить</button>
         </form>
     </section>
+
 
     <!-- Общее количество -->
     <section class="summary-section">
@@ -68,6 +112,13 @@
     </section>
 </main>
 
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script defer
+        src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<!-- добавляем локаль! -->
+<script defer
+        src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
 <script type="module" src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/filters.js') }}"></script>
 </body>

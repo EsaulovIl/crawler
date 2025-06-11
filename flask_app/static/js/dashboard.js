@@ -20,6 +20,7 @@ function getColorsForData(n) {
   return colors;
 }
 
+
 document.addEventListener('DOMContentLoaded', () => {
 
   // Контексты для дашборда
@@ -155,3 +156,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Первичная отрисовка без фильтров
   updateAll();
 });
+
+async function loadSummary() {
+    const r = await fetch("/api/summary");
+    const j = await r.json();
+    document.getElementById("kpiPlanned").textContent = j.planned ?? "–";
+    document.getElementById("kpiFinished").textContent = j.finished ?? "–";
+    document.getElementById("kpiToday").textContent = j.today ?? "–";
+}
+loadSummary();

@@ -25,3 +25,12 @@ export function initFilters({ onApply }) {
     onApply(params);
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  // ждём пока flatpickr окажется в window
+  if (typeof window.flatpickr !== "function") {
+    console.error("Flatpickr not loaded"); return;
+  }
+  flatpickr("#startDate", { dateFormat: "d.m.Y", locale: "ru" });
+  flatpickr("#endDate",   { dateFormat: "d.m.Y", locale: "ru" });
+});
