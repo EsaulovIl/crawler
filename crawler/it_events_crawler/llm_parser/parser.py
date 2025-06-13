@@ -17,12 +17,11 @@ FIELD_MAP = {
 
 def parse_llm_response(raw: str, url: str) -> dict:
     """
-    Извлекает поля из ответа LLM (строки вида 'Поле: "значение"').
-    Возвращает валидированный словарь или кидает LLMParseError.
+    Извлекает поля из ответа LLM (строки вида Поле: "значение").
+    Возвращает валидированный словарь или ошибку LLMParseError.
     """
     # инициализируем словарь с «Не указано»
     data = {v: "Не указано" for v in FIELD_MAP.values()}
-    # для каждого поля ищем регуляркой
     for line in raw.splitlines():
         for label, key in FIELD_MAP.items():
             m = re.match(rf'^{re.escape(label)}\s*:\s*"(.+)"\s*$', line)

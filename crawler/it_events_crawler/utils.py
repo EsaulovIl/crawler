@@ -74,7 +74,7 @@ def extract_visible_text(html_raw: str) -> str:
     for ln in lines:
         if not ln or RE_GARBAGE_LINE.match(ln):
             continue
-        # строка-мусор если ≤3 символа каждое слово
+        # строка-мусор если <=3 символа каждое слово
         if all(len(w) <= 3 for w in ln.split()):
             continue
         clean.append(ln)

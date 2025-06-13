@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Дашборд ИТ-мероприятий</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@4"></script>
 </head>
 <body>
 <header class="header-bar">
-    <!-- метрики -->
+    <!-- Метрики -->
     <div class="glass box-metrics">
         <span class="box-title">Overall</span>
 
@@ -23,7 +24,7 @@
         </div>
     </div>
 
-    <!-- “Сегодня” -->
+    <!-- Сегодня -->
     <div class="glass box-today">
         <span class="kpi-label">Сегодня</span>
         <span class="kpi-value" id="kpiToday">–</span>
@@ -44,82 +45,141 @@
         <form id="filters" class="filters-box glass">
             <span class="filter-title">Фильтры</span>
 
-            <!-- ▸ Дата «с – по» ----------------------------------- -->
+            <!-- Выбор даты -->
             <div class="filter-field date-range">
                 <label>Дата</label>
-                <input type="date" id="startDate">
+                <input type="text" id="startDate" autocomplete="off">
                 <span class="arrow">›</span>
-                <input type="date" id="endDate">
+                <input type="text" id="endDate" autocomplete="off">
             </div>
 
-            <!-- ▸ Тип -------------------------------------------- -->
+            <!-- Тип мероприятия-->
             <div class="filter-field">
                 <label for="typeSelect">Тип мероприятия</label>
-                <select id="typeSelect" class="chip-select">
+                <select id="typeSelect" class="chip-select" data-chip>
                     <option value="">Любой</option>
                 </select>
             </div>
 
-            <!-- ▸ Организатор ------------------------------------ -->
+            <!-- Организатор -->
             <div class="filter-field">
                 <label for="organizerSelect">Организатор</label>
-                <select id="organizerSelect" class="chip-select">
+                <select id="organizerSelect" class="chip-select" data-chip>
                     <option value="">Любой</option>
                 </select>
             </div>
 
-            <!-- ▸ Формат ----------------------------------------- -->
+            <!-- Формат мероприятия -->
             <div class="filter-field">
                 <label for="formatSelect">Формат</label>
-                <select id="formatSelect" class="chip-select">
+                <select id="formatSelect" class="chip-select" data-chip>
                     <option value="">Любой</option>
                 </select>
             </div>
 
-            <button class="btn btn-green" type="submit">Применить</button>
+            <button class="btn btn-gray" type="submit">Применить</button>
         </form>
     </section>
 
+    <div class="charts-grid">
 
-    <!-- Общее количество -->
-    <section class="summary-section">
-        <h2>Всего ИТ-мероприятий</h2>
-        <div class="summary-value" id="totalCount">–</div>
-    </section>
+        <!-- Линейный график событий во времени -->
+        <section class="chart-card" data-span="2x1">
+            <h3>Тренд по количеству мероприятий</h3>
+            <canvas id="trendChart"></canvas>
+        </section>
 
-    <!-- Линейный график событий во времени -->
-    <section class="trend-section">
-        <h2>Событий во времени</h2>
-        <div class="chart-container">
-            <canvas id="lineChart"></canvas>
-        </div>
-    </section>
+        <!-- Круговая диаграмма организаторов -->
+        <section class="chart-card" data-span="1x1">
+            <h3>Распределение по организаторам</h3>
+            <canvas id="orgChart"></canvas>
+            <ul id="orgLegend" class="chart-legend"></ul>
+        </section>
 
-    <!-- Круговая диаграмма форматов -->
-    <section class="format-section">
-        <h2>Доля форматов проведения</h2>
-        <div class="chart-container">
+        <!-- Radar chart типов мероприятий -->
+        <section class="chart-card" data-span="1x1">
+            <h3>Распределение мероприятий по типам</h3>
+            <canvas id="radarChart"></canvas>
+        </section>
+
+        <!-- Стек-столбцы форматов по типам -->
+        <section class="chart-card" data-span="2x1">
+            <h3>Распределение по форматам и типам мероприятий</h3>
+            <canvas id="typeFormatChart"></canvas>
+        </section>
+
+        <!-- Круговая диаграмма распределения по форматам -->
+        <section class="chart-card" data-span="1x1">
+            <h3>Распределение по форматам</h3>
             <canvas id="formatChart"></canvas>
-        </div>
-    </section>
+            <ul id="formatLegend" class="chart-legend"></ul>
+        </section>
 
-    <!-- Круговая диаграмма типов мероприятий -->
-    <section class="chart-section">
-        <h2 class="chart-title">Распределение мероприятий по типам</h2>
-        <div class="chart-container">
-            <canvas id="pieChart"></canvas>
-        </div>
-    </section>
+        <!-- Карточка-индикатор -->
+        <section class="chart-card" id="summaryCard" data-span="1x1">
+            <h3>Всего мероприятий</h3>
+
+            <!-- верхний блок -->
+            <div class="mini-row">
+                <canvas id="totalSpark"></canvas>
+                <div class="value-box up">
+                    <span class="big-val" id="totalNow">–</span>
+                    <span class="caption" id="totalCaption">Мероприятий в … году</span>
+                </div>
+            </div>
+
+            <hr>
+
+            <!-- нижний блок -->
+            <div class="mini-row">
+                <canvas id="topSpark"></canvas>
+                <div class="value-box" id="topBox">
+                    <span class="big-val" id="topNow">–</span>
+                    <span class="caption" id="topCaption">… в … году</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- donut chart по типам мероприятий -->
+        <section class="chart-card" data-span="1x1">
+            <h3>Распределение по типам</h3>
+
+            <canvas id="typeDonut"></canvas>
+            <ul id="typeLegend" class="chart-legend"></ul>
+        </section>
+
+        <!-- Стековая диаграмма типы по годам -->
+        <section class="chart-card" data-span="2x1">
+            <h3>Распределение типов мероприятий по годам</h3>
+            <canvas id="stackChart"></canvas>
+        </section>
+
+    </div>
 </main>
 
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script defer
-        src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<!-- добавляем локаль! -->
-<script defer
-        src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
+<script defer src="{{ url_for('static', filename='js/calendar.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/chip-menu.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/filters.js') }}"></script>
+<script>
+    Chart.register({
+      id: 'centerText',
+      afterDraw(chart){
+        const {ctx, chartArea:{width,height}} = chart;
+        const total = chart.config.data.totalValue;
+        if(!total) return;
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 34px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(total, width/2, height/2);
+        ctx.restore();
+      }
+    });
+</script>
 </body>
 </html>
