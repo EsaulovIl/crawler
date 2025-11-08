@@ -1,5 +1,4 @@
 from urllib.parse import urlparse
-import scrapy
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
 from it_events_crawler.search import google_search
@@ -48,7 +47,7 @@ class EventCrawlSpider(CrawlSpider):
 
         # формируем стартовые URL-ы
         spider.start_urls = google_search(
-            spider.query, spider.google_key, spider.cse_id, num_results=5
+            spider.query, spider.google_key, spider.cse_id, num_results=4
         )
 
         print(spider.start_urls)

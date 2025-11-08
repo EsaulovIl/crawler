@@ -349,6 +349,7 @@ hr{
 
 /* Капсулы filter-field */
 .filter-field {
+    max-width: 300px;
     position: relative;
     display: flex;
     align-items: center;

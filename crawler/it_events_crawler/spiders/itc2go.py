@@ -49,7 +49,8 @@ class Itc2Go(scrapy.Spider):
                 # url=response.url,
                 organizer="Не указано",
                 event_type="Не указано",
-                event_format="Не указано"
+                event_format="Не указано",
+                tags=self.get_tags(info)
             )
 
             href = info.css("a.event-title::attr(href)").get()

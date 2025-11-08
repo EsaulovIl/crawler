@@ -1,22 +1,22 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, DateTime, Date, Text
+from . import db
+
 import datetime
 
-Base = declarative_base()
 
-
-class Event(Base):
+class Event(db.Model):
     __tablename__ = 'events'
-    id = Column(Integer, primary_key=True)
-    title = Column(String(255), nullable=False)
-    organizer = Column(String(255), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    event_type = Column(String(255), nullable=False)
-    event_format = Column(String(255), nullable=False)
-    #location = Column(String(255), nullable=False)
-    #description = Column(Text, nullable=False)
-    url = Column(String(1024), unique=True, nullable=False)
-    #relevant = Column(Integer, nullable=False)
-    #summary = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    organizer = db.Column(db.String(255), nullable=False, default="Не указано")
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    event_type = db.Column(db.String(255), nullable=False, default="Не указано")
+    event_format = db.Column(db.String(255), nullable=False, default="Не указано")
+    location = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(1024), unique=True, nullable=False)
+    relevant = db.Column(db.Integer, nullable=False)
+    summary = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)

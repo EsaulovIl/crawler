@@ -11,4 +11,4 @@ gigachat
 emoji
 networkx
 fuzzywuzzy
-#python-Levenshtein
+python-Levenshtein

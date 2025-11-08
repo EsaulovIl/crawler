@@ -15,6 +15,7 @@ ROBOTSTXT_OBEY = False
 ITEM_PIPELINES = {
     # 'it_events_crawler.pipelines.RawHtmlPipeline': 300,
     "it_events_crawler.pipelines.LLMEventPipeline": 300,
+    "it_events_crawler.pipelines.DropIncompletePipeline": 350,
 }
 
 # Google Custom Search API
@@ -23,7 +24,7 @@ CUSTOM_SEARCH_ENGINE_ID = os.getenv('CUSTOM_SEARCH_ENGINE_ID')
 QUERY = "ИТ мероприятия Нижний Новгород"
 
 FEEDS = {
-    "data/events_structured.json": {
+    "data/%(name)s_items.json": {
         "format": "json",
         "encoding": "utf8",
         "indent": 2,
@@ -31,7 +32,7 @@ FEEDS = {
         "fields": [
             "title", "organizer", "start_date", "end_date",
             "event_type", "event_format", "location",
-            "description", "url"
+            "description", "url", "tags"
         ],
     },
     # DEBUG файл: приходят очищенные html
@@ -45,4 +46,4 @@ FEEDS = {
 }
 
 # Отключить излишний вывод в консоль
-LOG_LEVEL = 'WARNING'
+LOG_LEVEL = 'WARN'

@@ -1,13 +1,9 @@
-# На всякий оставил принты лишние, чтобы можно было видеть,
-# а что там вообще выводит ИИшка. Почти вс (или даже все)
-# можно спокойно удалять
-
 import os
 import json, html, sys, re, emoji, sqlite3
 import networkx as nx
 from pathlib import Path
 from fuzzywuzzy import fuzz
-from datetime import datetime
+from datetime import datetime, date
 from gigachat import GigaChat
 from bs4 import BeautifulSoup
 from collections import defaultdict
@@ -20,11 +16,18 @@ GIGACHAT_API_KEY = os.getenv('GIGACHAT_API_KEY')
 CA_BUNDLE = None
 VERIFY_SSL = False
 
+model_params = {
+    "model": "GigaChat",
+    "temperature": 0.3,
+    "top_p": 0.95,
+    "max_tokens": 1024,
+    "repetition_penalty": 1.05,
+    "stream": False,
+    "update_interval": 0
+}
 
-def clean():
-    input_path = "/data/events_structured.json"
-    output_path = "/data/events_result.json"
 
+def clean(json_path):
     def clean_text(text):
         if not isinstance(text, str):
             return text
@@ -36,13 +39,14 @@ def clean():
         return text.strip()
 
     def convert_date(date_str):
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            return dt.strftime("%Y-%m-%d")
-        except Exception:
-            return date_str
+        for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return date_str
 
-    with open(input_path, 'r', encoding='utf-8') as infile:
+    with open(json_path, 'r', encoding='utf-8') as infile:
         data = json.load(infile)
 
     cleaned = []
@@ -55,44 +59,32 @@ def clean():
 
         cleaned.append(obj)
 
-    with open(output_path, 'w', encoding='utf-8') as outfile:
+    with open(json_path, 'w', encoding='utf-8') as outfile:
         json.dump(cleaned, outfile, ensure_ascii=False, indent=4)
 
 
-def gigachat_1():
-    input_json = "ГигаЧад_Спарсили_Очистка.json"
-    output_json = "ГигаЧад_1_Релевантность.json"
-
+def gigachat_1(json_path):
     prompt_system_1 = """
-    На вход ты получишь 4 параметра:
+    На вход ты получишь 3 параметра:
     - location (место проведения мероприятия)
-    - title (заголовок мероприятния)
+    - title (заголовок мероприятия)
     - description (описание мероприятия)
 
-    Твоя задча: Определить релевантность мероприятия
-    Мероприятне релевантно, если оно:
-    - Отностися к сфере ИТ
-    - Проходит ТОЛЬКО в Нижнем Новгороде ИЛИ в формате Онлайн
+    Твоя задача: Определить релевантность мероприятия
+    Мероприятие релевантно, если оно:
+    - Проходит ТОЛЬКО в Нижнем Новгороде. Если в адресе, например, указан другой город(Например, г. Москва, г. Санкт-Петербург, г. Казань и другие города), то данное мероприятие не релевантно
+    - Если мероприятие проходит онлайн, но не в Нижнем Новгороде, то оно считается не релевантным
+    - Относится к сфере ИТ
     Если релевантно, помечай цифрой 1. Если нет — 0
 
     Формат вывода:
     Только одна цифра (1 или 0), ничего больше 
     """.strip()
 
-    model_params = {
-        "model": "GigaChat",
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-        "repetition_penalty": 1.05,
-        "stream": False,
-        "update_interval": 0
-    }
-
     try:
-        entries = json.loads(Path(input_json).read_text(encoding="utf-8"))
+        entries = json.loads(Path(json_path).read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Не удалось открыть {input_json}: {e}", file=sys.stderr)
+        print(f"Не удалось открыть {json}: {e}", file=sys.stderr)
         return
 
     giga = GigaChat(
@@ -110,156 +102,179 @@ def gigachat_1():
         start_date = html.unescape(obj.get("start_date", ""))
         end_date = html.unescape(obj.get("end_date", ""))
         tags = html.unescape(obj.get("tags", []))
+        organizer = html.unescape(obj.get("organizer", []))
+        event_type = html.unescape(obj.get("event_type", []))
+        event_format = html.unescape(obj.get("event_format", []))
+        url = html.unescape(obj.get("url", []))
 
         try:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-            today = datetime.today().date()
-            if start_date < today:
+            user_msg = f"location: {location}\ntitle: {title}\ndescription: {description}"
+
+            print(user_msg)
+
+            payload = Chat(
+                messages=[
+                    Messages(role=MessagesRole.SYSTEM, content=prompt_system_1),
+                    Messages(role=MessagesRole.USER, content=user_msg),
+                ],
+                **model_params,
+            )
+
+            try:
+                response = giga.chat(payload)
+                chat_ans = response.choices[0].message.content.strip()
+                print(chat_ans)
+                print()
+
+            except Exception as e:
+                print(f"Ошибка запроса: {e}", file=sys.stderr)
                 chat_ans = "0"
-            else:
-                user_msg = f"location: {location}\ntitle: {title}\ndescription: {description}"
-
-                print(user_msg)
-
-                payload = Chat(
-                    messages=[
-                        Messages(role=MessagesRole.SYSTEM, content=prompt_system_1),
-                        Messages(role=MessagesRole.USER, content=user_msg),
-                    ],
-                    **model_params,
-                )
-
-                try:
-                    response = giga.chat(payload)
-                    chat_ans = response.choices[0].message.content.strip()
-                    print(chat_ans)
-                    print()
-
-                except Exception as e:
-                    print(f"Ошибка запроса: {e}", file=sys.stderr)
-                    chat_ans = "0"
-                    print(chat_ans)
-                    print()
+                print(chat_ans)
+                print()
         except Exception as e:
             print(f"Ошибка разбора даты: {e}", file=sys.stderr)
             chat_ans = "0"
 
         results.append({
             "title": title,
+            "organizer": organizer,
             "description": description,
             "location": location,
             "start_date": start_date,
             "end_date": end_date,
+            "event_type": event_type,
+            "event_format": event_format,
             "tags": tags,
-            "relevant": chat_ans
+            "url": url,
+            "relevant": chat_ans,
         })
 
-    Path(output_json).write_text(
+    for ev in results:
+        for fld in ("start_date", "end_date"):
+            if isinstance(ev[fld], date):
+                ev[fld] = ev[fld].strftime("%Y-%m-%d")
+
+    Path(json_path).write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"Обработано: {len(results)} шт.")
-    print(f"Итог сохранён в {Path(output_json).resolve()}")
+    print(f"Итог сохранён в {Path(json_path).resolve()}")
 
 
-def deduplicate():
-    input_file = "ГигаЧад_1_Релевантность.json"
-    output_file = "ГигаЧад_Без_Дублей.json"
+STOP = set("""
+    of the a an for to              # англ. артикли / предлоги
+    на в по                         # рус. предлоги
+    2025 2024 2023 2022 2021 2020   # частые годы
+""".split())
 
+RX_NONALNUM = re.compile(r"[^\w]+", re.U)  # всё, кроме букв/цифр
+
+
+def norm_str(s: str) -> str:
+    """Нижний регистр, одиночные пробелы, без стоп-слов"""
+    words = RX_NONALNUM.sub(" ", s.lower()).split()
+    return " ".join(w for w in words if w not in STOP)
+
+
+def extract_city(loc: str) -> str:
+    """Наивно берём первое слово-город (г. Москва → москва)"""
+    m = re.search(r"[А-ЯA-ZЁ][\w\-]+", loc)
+    return m.group(0).lower() if m else ""
+
+
+# Основная функция
+def deduplicate(json_path: str, *, name_thr=85, loc_thr=85) -> None:
+    p = Path(json_path)
     try:
-        entries = json.loads(Path(input_file).read_text(encoding="utf-8"))
+        entries = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Ошибка чтения файла {input_file}: {e}")
+        print(f"Не удалось открыть {p}: {e}", file=sys.stderr)
         return
 
-    fixed = []
-    by_date = defaultdict(list)
-
-    for idx, entry in enumerate(entries):
-        if entry.get("relevant") == "0":
-            fixed.append((idx, entry))
-        else:
-            by_date[entry.get("start_date", "")].append((idx, entry))
-
-    def is_duplicate(e1, e2):
-        name_sim = fuzz.token_set_ratio(e1['title'], e2['title'])
-        loc_sim = fuzz.token_set_ratio(e1['location'], e2['location'])
-        return name_sim >= 85 and loc_sim >= 85
-
-    print("\nПоиск дублей...")
-
-    for date, group in by_date.items():
-        if len(group) <= 1:
-            fixed.extend(group)
+    # строим ключ для быстрой группировки
+    buckets = defaultdict(list)  # key -> [(idx, entry), ...]
+    for idx, ev in enumerate(entries):
+        if ev.get("relevant") == "0":  # уже помечено
+            buckets[f"___irrelevant___"].append((idx, ev))
             continue
 
-        G = nx.Graph()
-        indices = [idx for idx, _ in group]
+        core_title = norm_str(ev.get("title", ""))
+        city = extract_city(ev.get("location", ""))
+        ev_type = (ev.get("event_type") or "").lower()
 
-        for idx in range(len(group)):
-            G.add_node(idx)
+        key = f"{core_title}|{ev_type}|{city}"
+        buckets[key].append((idx, ev))
+
+    # внутри ищем мягкие дубли
+    fixed = []  # (orig_idx, entry)
+
+    def is_dup(a, b) -> bool:
+        # если форматы разные и оба известны → не дубликаты
+        if a.get("event_type") and b.get("event_type") \
+                and a["event_type"] != b["event_type"]:
+            return False
+        name_sim = fuzz.token_set_ratio(a["title"], b["title"])
+        loc_sim = fuzz.token_set_ratio(a["location"], b["location"])
+        return name_sim >= name_thr and loc_sim >= loc_thr
+
+    print("\nПоиск дублей…")
+
+    for key, group in buckets.items():
+        if len(group) == 1:
+            fixed.append(group[0])
+            continue
+
+        # строим граф «похожих» записей
+        G = nx.Graph()
+        G.add_nodes_from(range(len(group)))
 
         for i in range(len(group)):
             for j in range(i + 1, len(group)):
-                e1 = group[i][1]
-                e2 = group[j][1]
-                if is_duplicate(e1, e2):
+                if is_dup(group[i][1], group[j][1]):
                     G.add_edge(i, j)
-                    print(f"\nДата: {date}")
-                    print("Найдено похожее:")
-                    print(f" → [{i}] {e1['title']} | {e1['location']}")
-                    print(f" → [{j}] {e2['title']} | {e2['location']}")
 
-        components = list(nx.connected_components(G))
-        for component in components:
-            if len(component) == 1:
-                fixed.append(group[list(component)[0]])
+        for comp in nx.connected_components(G):
+            comp = list(comp)
+            if len(comp) == 1:  # уникальная запись
+                fixed.append(group[comp[0]])
                 continue
 
-            sorted_component = sorted(
-                component,
-                key=lambda idx: len(group[idx][1].get("description", "")),
+            # выбираем «самую полную» как оригинал
+            comp_sorted = sorted(
+                comp,
+                key=lambda k: len(group[k][1].get("description", "")),
                 reverse=True
             )
 
-            print(f"\nГруппа дублей (дата: {date}):")
-            for idx_in_group in sorted_component:
-                idx, event = group[idx_in_group]
-                print(f" - {event['title']} ({len(event.get('description', ''))} символов)")
+            orig_idx, orig = group[comp_sorted[0]]
+            fixed.append((orig_idx, orig))  # оставляем
 
-            for k, idx_in_group in enumerate(sorted_component):
-                entry_idx, entry = group[idx_in_group]
-                if k == 0:
-                    print(f"Оставляем как оригинал: {entry['title']}")
-                    fixed.append((entry_idx, entry))
-                else:
-                    entry["relevant"] = "0"
-                    print(f"Помечаем как дубль: {entry['title']}")
-                    fixed.append((entry_idx, entry))
+            for dup_k in comp_sorted[1:]:
+                dup_idx, dup = group[dup_k]
+                dup["relevant"] = "0"  # помечаем
+                fixed.append((dup_idx, dup))
+
+                print(f"  • дубль → «{dup['title']}»")
 
     fixed_sorted = sorted(fixed, key=lambda x: x[0])
-    cleaned_entries = [entry for _, entry in fixed_sorted]
+    result = [ev for _, ev in fixed_sorted]
 
-    Path(output_file).write_text(
-        json.dumps(cleaned_entries, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
-
-    print(f"\nОбработка завершена. Событий: {len(cleaned_entries)}. Файл сохранён в: {output_file}")
+    p.write_text(json.dumps(result, ensure_ascii=False, indent=2),
+                 encoding="utf-8")
+    print(f"\nДедупликация завершена. Итог: {len(result)} записей.")
+    print(f" Файл сохранён: {p.resolve()}")
 
 
-def gigachat_2():
-    input_json = "ГигаЧад_Без_Дублей.json"
-    output_json = "ГигаЧад_2_Тип.json"
-
+def gigachat_2(json_path):
     prompt_system_2 = """
     На вход ты получишь 3 параметра:
     - tags (тэг мероприятия)
-    - title (заголовок мероприятния)
+    - title (заголовок мероприятия)
     - description (описание мероприятия)
 
-    Твоя задча: Классифицировать тему
+    Твоя задача: Классифицировать тему
     Если в названии, описании или теге явно указано, к какому типу относится событие (например, «Хакатон», «Конференция», «Митап» и т. д.), используйте эту информацию для классификации — но только в том случае, если это действительно соответствует контексту.
 
     Выберите только одну тему из следующего списка:
@@ -303,20 +318,10 @@ def gigachat_2():
     ТОЛЬКО ОДНА ЦИФРА (1-12) без каких-либо дополнительных слов или символов 
     """.strip()
 
-    model_params = {
-        "model": "GigaChat",
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-        "repetition_penalty": 1.05,
-        "stream": False,
-        "update_interval": 0
-    }
-
     try:
-        entries = json.loads(Path(input_json).read_text(encoding="utf-8"))
+        entries = json.loads(Path(json_path).read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Не удалось открыть {input_json}: {e}", file=sys.stderr)
+        print(f"Не удалось открыть {json_path}: {e}", file=sys.stderr)
         return
 
     giga = GigaChat(
@@ -335,94 +340,116 @@ def gigachat_2():
         end_date = html.unescape(obj.get("end_date", ""))
         tags = html.unescape(obj.get("tags", []))
         relevant = html.unescape(obj.get("relevant", ""))
-        if relevant != "1":
+        organizer = html.unescape(obj.get("organizer", []))
+        event_type = html.unescape(obj.get("event_type", []))
+        event_format = html.unescape(obj.get("event_format", []))
+        url = html.unescape(obj.get("url", []))
+
+        if event_type == "Не указано":
+            if relevant != "1":
+                results.append({
+                    "title": title,
+                    "organizer": organizer,
+                    "description": description,
+                    "location": location,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "tags": tags,
+                    "relevant": relevant,
+                    "event_format": event_format,
+                    "url": url,
+                    "event_type": "Не указано"
+                })
+                continue
+
+            user_msg = f"tags: {tags}\ntitle: {title}\ndescription: {description}"
+
+            print(user_msg)
+
+            payload = Chat(
+                messages=[
+                    Messages(role=MessagesRole.SYSTEM, content=prompt_system_2),
+                    Messages(role=MessagesRole.USER, content=user_msg),
+                ],
+                **model_params,
+            )
+
+            try:
+                response = giga.chat(payload)
+                chat_ans = response.choices[0].message.content.strip()
+                print(chat_ans)
+                print()
+
+            except Exception as e:
+                print(f"Ошибка запроса: {e}", file=sys.stderr)
+                chat_ans = ""
+                print(chat_ans)
+                print()
+
+            TOPIC_NAMES = {
+                1: "Вебинар",
+                2: "Воркшоп",
+                3: "Митап",
+                4: "Конференция",
+                5: "Форум/Саммит",
+                6: "Хакатон/Чемпионат",
+                7: "Выставка/Шоукейс",
+                8: "Демо-день/Питч-сессия",
+                9: "Образовательная программа",
+                10: "Открытый конкурс",
+                11: "Нетворкинг-событие",
+                12: "Клубное событие"
+            }
+
+            try:
+                ev_type_name = TOPIC_NAMES.get(int(chat_ans), "")
+            except ValueError:
+                ev_type_name = ""
+
             results.append({
                 "title": title,
+                "organizer": organizer,
                 "description": description,
                 "location": location,
                 "start_date": start_date,
                 "end_date": end_date,
                 "tags": tags,
                 "relevant": relevant,
-                "event_type": ""
+                "event_format": event_format,
+                "url": url,
+                "event_type": ev_type_name
             })
-            continue
+        else:
+            results.append({
+                "title": title,
+                "organizer": organizer,
+                "description": description,
+                "location": location,
+                "start_date": start_date,
+                "end_date": end_date,
+                "tags": tags,
+                "relevant": relevant,
+                "event_format": event_format,
+                "url": url,
+                "event_type": event_type
+            })
 
-        user_msg = f"tags: {tags}\ntitle: {title}\ndescription: {description}"
-
-        print(user_msg)
-
-        payload = Chat(
-            messages=[
-                Messages(role=MessagesRole.SYSTEM, content=prompt_system_2),
-                Messages(role=MessagesRole.USER, content=user_msg),
-            ],
-            **model_params,
-        )
-
-        try:
-            response = giga.chat(payload)
-            chat_ans = response.choices[0].message.content.strip()
-            print(chat_ans)
-            print()
-
-        except Exception as e:
-            print(f"Ошибка запроса: {e}", file=sys.stderr)
-            chat_ans = ""
-            print(chat_ans)
-            print()
-
-        TOPIC_NAMES = {
-            1: "Вебинар",
-            2: "Воркшоп",
-            3: "Митап",
-            4: "Конференция",
-            5: "Форум/Саммит",
-            6: "Хакатон/Чемпионат",
-            7: "Выставка/Шоукейс",
-            8: "Демо-день/Питч-сессия",
-            9: "Образовательная программа",
-            10: "Открытый конкурс",
-            11: "Нетворкинг-событие",
-            12: "Клубное событие"
-        }
-
-        try:
-            ev_type_name = TOPIC_NAMES.get(int(chat_ans), "")
-        except ValueError:
-            ev_type_name = ""
-
-        results.append({
-            "title": title,
-            "description": description,
-            "location": location,
-            "start_date": start_date,
-            "end_date": end_date,
-            "tags": tags,
-            "relevant": relevant,
-            "ev_type": ev_type_name
-
-        })
-
-    Path(output_json).write_text(
+    Path(json_path).write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"Обработано: {len(results)} шт.")
-    print(f"Итог сохранён в {Path(output_json).resolve()}")
+    print(f"Итог сохранён в {Path(json_path).resolve()}")
 
 
-def gigachat_3():
-    input_json = "ГигаЧад_2_Тип.json"
-    output_json = "ГигаЧад_3_Формат.json"
-
+def gigachat_3(json_path):
     prompt_system_3 = """
     На вход ты получишь 5 параметров:
     - location (место проведения мероприятия)
-    - event_type (тип мероприятния)
+    - event_type (тип мероприятия)
     - tags (тэг мероприятия)
-    - title (заголовок мероприятния)
+    - title (заголовок мероприятия)
     - description (описание мероприятия)
 
     Формат — это способ, с помощью которого участники взаимодействуют с мероприятием: физически, удалённо или и так, и так.
@@ -452,20 +479,10 @@ def gigachat_3():
     ТОЛЬКО ОДНА ЦИФРА (1-3) без каких-либо дополнительных слов или символов 
     """.strip()
 
-    model_params = {
-        "model": "GigaChat",
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-        "repetition_penalty": 1.05,
-        "stream": False,
-        "update_interval": 0
-    }
-
     try:
-        entries = json.loads(Path(input_json).read_text(encoding="utf-8"))
+        entries = json.loads(Path(json_path).read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Не удалось открыть {input_json}: {e}", file=sys.stderr)
+        print(f"Не удалось открыть {json_path}: {e}", file=sys.stderr)
         return
 
     giga = GigaChat(
@@ -485,88 +502,108 @@ def gigachat_3():
         tags = html.unescape(obj.get("tags", []))
         relevant = html.unescape(obj.get("relevant", ""))
         event_type = html.unescape(obj.get("event_type", ""))
+        organizer = html.unescape(obj.get("organizer", []))
+        event_format = html.unescape(obj.get("event_format", []))
+        url = html.unescape(obj.get("url", []))
 
-        if relevant != "1":
+        if event_format == "Не указано":
+
+            if relevant != "1":
+                results.append({
+                    "title": title,
+                    "organizer": organizer,
+                    "description": description,
+                    "location": location,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "tags": tags,
+                    "relevant": relevant,
+                    "event_type": "Не указано",
+                    "event_format": "Не указано",
+                    "url": url,
+                })
+                continue
+
+            user_msg = f"location: {location}\nev_type: {event_type}\ntags: {tags}\ntitle: {title}\ndescription: {description}"
+
+            print(user_msg)
+
+            payload = Chat(
+                messages=[
+                    Messages(role=MessagesRole.SYSTEM, content=prompt_system_3),
+                    Messages(role=MessagesRole.USER, content=user_msg),
+                ],
+                **model_params,
+            )
+
+            try:
+                response = giga.chat(payload)
+                chat_ans = response.choices[0].message.content.strip()
+                print(chat_ans)
+                print()
+
+            except Exception as e:
+                print(f"Ошибка запроса: {e}", file=sys.stderr)
+                chat_ans = ""
+                print(chat_ans)
+                print()
+
+            FORMAT_NAMES = {
+                1: "Очно",
+                2: "Онлайн",
+                3: "Гибрид"
+            }
+
+            try:
+                ev_format_name = FORMAT_NAMES.get(int(chat_ans), "")
+            except ValueError:
+                ev_format_name = ""
+
             results.append({
                 "title": title,
+                "organizer": organizer,
                 "description": description,
                 "location": location,
                 "start_date": start_date,
                 "end_date": end_date,
                 "tags": tags,
                 "relevant": relevant,
-                "event_type": "",
-                "event_format": ""
+                "event_type": event_type,
+                "event_format": ev_format_name,
+                "url": url,
             })
-            continue
+        else:
+            results.append({
+                "title": title,
+                "organizer": organizer,
+                "description": description,
+                "location": location,
+                "start_date": start_date,
+                "end_date": end_date,
+                "tags": tags,
+                "relevant": relevant,
+                "event_type": event_type,
+                "event_format": event_format,
+                "url": url,
+            })
 
-        user_msg = f"location: {location}\nev_type: {event_type}\ntags: {tags}\ntitle: {title}\ndescription: {description}"
-
-        print(user_msg)
-
-        payload = Chat(
-            messages=[
-                Messages(role=MessagesRole.SYSTEM, content=prompt_system_3),
-                Messages(role=MessagesRole.USER, content=user_msg),
-            ],
-            **model_params,
-        )
-
-        try:
-            response = giga.chat(payload)
-            chat_ans = response.choices[0].message.content.strip()
-            print(chat_ans)
-            print()
-
-        except Exception as e:
-            print(f"Ошибка запроса: {e}", file=sys.stderr)
-            chat_ans = ""
-            print(chat_ans)
-            print()
-
-        FORMAT_NAMES = {
-            1: "Очно",
-            2: "Онлайн",
-            3: "Гибрид"
-        }
-
-        try:
-            ev_format_name = FORMAT_NAMES.get(int(chat_ans), "")
-        except ValueError:
-            ev_format_name = ""
-
-        results.append({
-            "title": title,
-            "description": description,
-            "location": location,
-            "start_date": start_date,
-            "end_date": end_date,
-            "tags": tags,
-            "relevant": relevant,
-            "event_type": event_type,
-            "event_format": ev_format_name
-        })
-
-    Path(output_json).write_text(
+    Path(json_path).write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"Обработано: {len(results)} шт.")
-    print(f"Итог сохранён в {Path(output_json).resolve()}")
+    print(f"Итог сохранён в {Path(json_path).resolve()}")
 
 
-def gigachat_4():
-    input_json = "ГигаЧад_3_Формат.json"
-    output_json = "ГигаЧад_4_Организатор.json"
-
+def gigachat_4(json_path):
     prompt_system_4 = """
     На вход ты получишь 3 параметра:
     - location (место проведения мероприятия)
-    - title (заголовок мероприятния)
+    - title (заголовок мероприятия)
     - description (описание мероприятия)
 
-    Твоя задача: найти и вывести Организатора мероприятия
+    Твоя задача: найти и вывести организатора мероприятия
     Как найти:
     - В тексте явно указано «Организатор мероприятия» или что-то похожее
     - Из описания понятно, кто именно организует мероприятие
@@ -575,23 +612,13 @@ def gigachat_4():
     Если организатор отсутствует, выводи цифру 0
 
     Формат вывода:
-    Организатор мероприятия полностью (только название организатора, без воодных слов и без «организатор...») или ТОЛЬКО ОДНУ цифру 0  
+    Название организатора(без вводных слов и без «организатор...») или ТОЛЬКО ОДНУ цифру 0  
     """.strip()
 
-    model_params = {
-        "model": "GigaChat",
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-        "repetition_penalty": 1.05,
-        "stream": False,
-        "update_interval": 0
-    }
-
     try:
-        entries = json.loads(Path(input_json).read_text(encoding="utf-8"))
+        entries = json.loads(Path(json_path).read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Не удалось открыть {input_json}: {e}", file=sys.stderr)
+        print(f"Не удалось открыть {json_path}: {e}", file=sys.stderr)
         return
 
     giga = GigaChat(
@@ -612,75 +639,90 @@ def gigachat_4():
         relevant = html.unescape(obj.get("relevant", ""))
         event_type = html.unescape(obj.get("event_type", ""))
         event_format = html.unescape(obj.get("event_format", ""))
+        organizer = html.unescape(obj.get("organizer", []))
+        url = html.unescape(obj.get("url", []))
 
-        if relevant != "1":
+        if organizer == "Не указано":
+            if relevant != "1":
+                results.append({
+                    "title": title,
+                    "organizer": "Не указано",
+                    "description": description,
+                    "location": location,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "tags": tags,
+                    "relevant": relevant,
+                    "event_type": "Не указано",
+                    "event_format": "Не указано",
+                    "url": url
+                })
+                continue
+
+            user_msg = f"location: {location}\ntitle: {title}\ndescription: {description}"
+
+            print(user_msg)
+
+            payload = Chat(
+                messages=[
+                    Messages(role=MessagesRole.SYSTEM, content=prompt_system_4),
+                    Messages(role=MessagesRole.USER, content=user_msg),
+                ],
+                **model_params,
+            )
+
+            try:
+                response = giga.chat(payload)
+                chat_ans = response.choices[0].message.content.strip()
+                print(chat_ans)
+                print()
+
+            except Exception as e:
+                print(f"Ошибка запроса: {e}", file=sys.stderr)
+                chat_ans = ""
+                print(chat_ans)
+                print()
+
+            organizer = "" if chat_ans == "0" else chat_ans
+
             results.append({
                 "title": title,
+                "organizer": organizer,
                 "description": description,
                 "location": location,
                 "start_date": start_date,
                 "end_date": end_date,
                 "tags": tags,
                 "relevant": relevant,
-                "event_type": "",
-                "event_format": "",
-                "organizer": ""
-
+                "event_type": event_type,
+                "event_format": event_format,
+                "url": url
             })
-            continue
+        else:
+            results.append({
+                "title": title,
+                "organizer": organizer,
+                "description": description,
+                "location": location,
+                "start_date": start_date,
+                "end_date": end_date,
+                "tags": tags,
+                "relevant": relevant,
+                "event_type": event_type,
+                "event_format": event_format,
+                "url": url
+            })
 
-        user_msg = f"location: {location}\ntitle: {title}\ndescription: {description}"
-
-        print(user_msg)
-
-        payload = Chat(
-            messages=[
-                Messages(role=MessagesRole.SYSTEM, content=prompt_system_4),
-                Messages(role=MessagesRole.USER, content=user_msg),
-            ],
-            **model_params,
-        )
-
-        try:
-            response = giga.chat(payload)
-            chat_ans = response.choices[0].message.content.strip()
-            print(chat_ans)
-            print()
-
-        except Exception as e:
-            print(f"Ошибка запроса: {e}", file=sys.stderr)
-            chat_ans = ""
-            print(chat_ans)
-            print()
-
-        organizer = "" if chat_ans == "0" else chat_ans
-
-        results.append({
-            "title": title,
-            "description": description,
-            "location": location,
-            "start_date": start_date,
-            "end_date": end_date,
-            "tags": tags,
-            "relevant": relevant,
-            "event_type": event_type,
-            "event_format": event_format,
-            "organizer": organizer
-        })
-
-    Path(output_json).write_text(
+    Path(json_path).write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"Обработано: {len(results)} шт.")
-    print(f"Итог сохранён в {Path(output_json).resolve()}")
+    print(f"Итог сохранён в {Path(json_path).resolve()}")
 
 
-def gigachat_5():
-    input_json = "ГигаЧад_4_Организатор.json"
-    output_json = "ГигаЧад_5_Саммари.json"
-
+def gigachat_5(json_path):
     prompt_system_5 = """
     На вход ты получишь 7 параметра:
     - title (заголовок мероприятия)
@@ -715,23 +757,13 @@ def gigachat_5():
     Если какое-то поле отсутствует или пустое, просто не упоминай его, но сохраняй связность и логичность текста.
 
     Формат вывода:
-    ТОЛЬКО саммари без дополнительной инфомрации 
+    ТОЛЬКО саммари без дополнительной информации 
     """.strip()
 
-    model_params = {
-        "model": "GigaChat",
-        "temperature": 0.3,
-        "top_p": 0.95,
-        "max_tokens": 1024,
-        "repetition_penalty": 1.05,
-        "stream": False,
-        "update_interval": 0
-    }
-
     try:
-        entries = json.loads(Path(input_json).read_text(encoding="utf-8"))
+        entries = json.loads(Path(json_path).read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"Не удалось открыть {input_json}: {e}", file=sys.stderr)
+        print(f"Не удалось открыть {json_path}: {e}", file=sys.stderr)
         return
 
     giga = GigaChat(
@@ -753,6 +785,7 @@ def gigachat_5():
         event_type = html.unescape(obj.get("event_type", ""))
         event_format = html.unescape(obj.get("event_format", ""))
         organizer = html.unescape(obj.get("organizer", ""))
+        url = html.unescape(obj.get("url", []))
 
         if relevant != "1":
             results.append({
@@ -763,10 +796,11 @@ def gigachat_5():
                 "end_date": end_date,
                 "tags": tags,
                 "relevant": relevant,
-                "event_type": "",
-                "event_format": "",
-                "organizer": "",
-                "summary": ""
+                "event_type": "Не указано",
+                "event_format": "Не указано",
+                "organizer": "Не указано",
+                "summary": "Не указано",
+                "url": url
             })
             continue
 
@@ -805,67 +839,17 @@ def gigachat_5():
             "event_type": event_type,
             "event_format": event_format,
             "organizer": organizer,
-            "summary": chat_ans
+            "summary": chat_ans,
+            "url": url
         })
 
-    Path(output_json).write_text(
+    Path(json_path).write_text(
         json.dumps(results, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
 
     print(f"Обработано: {len(results)} шт.")
-    print(f"Итог сохранён в {Path(output_json).resolve()}")
-
-
-def json_to_sqlite():
-    json_path = "ГигаЧад_5_Саммари.json"
-    db_path = "ГигаЧад_Финал.db"
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT,
-        description TEXT,
-        location TEXT,
-        start_date TEXT,
-        end_date TEXT,
-        relevant INTEGER,
-        event_type TEXT,
-        event_format TEXT,
-        organizer TEXT,
-        summary TEXT
-    )
-    """)
-
-    cursor.execute("DELETE FROM events")
-
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    for event in data:
-        cursor.execute("""
-            INSERT INTO events (title, description, location, start_date, end_date, relevant, event_type, event_format, organizer, summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            event.get("title"),
-            event.get("description"),
-            event.get("location"),
-            event.get("start_date"),
-            event.get("end_date"),
-            int(event.get("relevant", 0)),
-            event.get("event_type"),
-            event.get("event_format"),
-            event.get("event_organizer"),
-            event.get("summary")
-        ))
-
-    conn.commit()
-    conn.close()
-
-    print(f"Загружено {len(data)} событий в базу {db_path}.")
+    print(f"Итог сохранён в {Path(json_path).resolve()}")
 
 
 if __name__ == "__main__":
@@ -876,4 +860,3 @@ if __name__ == "__main__":
     gigachat_3()
     gigachat_4()
     gigachat_5()
-    json_to_sqlite()

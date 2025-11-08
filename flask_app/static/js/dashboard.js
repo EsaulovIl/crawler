@@ -2,13 +2,39 @@ import { initFilters } from './filters.js';
 
 //Набор цветов
 const baseColors = [
-    'rgba(54, 162, 235, 0.7)',
-    'rgba(255, 99, 132, 0.7)',
-    'rgba(255, 206, 86, 0.7)',
-    'rgba(75, 192, 192, 0.7)',
-    'rgba(153, 102, 255, 0.7)',
-    'rgba(255, 159, 64, 0.7)',
-    'rgba(201, 203, 207, 0.7)'
+  'rgba( 54, 162, 235, 0.7)',   // синий
+  'rgba(255,  99, 132, 0.7)',   // розовый-красный
+  'rgba(255, 206,  86, 0.7)',   // жёлтый
+  'rgba( 75, 192, 192, 0.7)',   // бирюзовый
+  'rgba(153, 102, 255, 0.7)',   // сиреневый
+  'rgba(255, 159,  64, 0.7)',   // оранжевый
+  'rgba(201, 203, 207, 0.7)',   // серый
+
+  'rgba(  0, 123,  85, 0.7)',   // изумруд
+  'rgba(255,  87,  34, 0.7)',   // тёплый терракот
+  'rgba(255, 140,   0, 0.7)',   // мандариновый
+  'rgba(139,   0, 139, 0.7)',   // фуксия-пурпур
+  'rgba(  0, 191, 255, 0.7)',   // небесно-голубой
+  'rgba(189, 183, 107, 0.7)',   // хаки-оливковый
+  'rgba(255, 105, 180, 0.7)',   // яркий розовый
+
+  'rgba( 46, 139,  87, 0.7)',   // морская волна
+  'rgba(210, 105,  30, 0.7)',   // шоколад
+  'rgba(112, 128, 144, 0.7)',   // сланцевый
+  'rgba( 70, 130, 180, 0.7)',   // стальной голубой
+  'rgba(218, 165,  32, 0.7)',   // золотисто-жёлтый
+  'rgba(199,  21, 133, 0.7)',   // яркий кармин
+
+  'rgba(100, 149, 237, 0.7)',   // васильковый
+  'rgba( 60, 179, 113, 0.7)',   // средне-морской
+  'rgba(233, 150, 122, 0.7)',   // коралл
+  'rgba(147, 112, 219, 0.7)',   // средняя сирень
+  'rgba(250, 128, 114, 0.7)',   // лосось
+  'rgba(128,   0,   0, 0.7)',   // бордо
+  'rgba(  0,  97, 255, 0.7)',   // классический синий
+  'rgba( 34, 139,  34, 0.7)',   // лесной зелёный
+  'rgba(255, 215,   0, 0.7)',   // яркое золото
+  'rgba(  0,   0,   0, 0.7)'    // чёрный полупрозрачный
 ];
 
 
@@ -258,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             plugins:{
                 legend:{ position:'bottom',
-                    labels:{ usePointStyle:true, boxWidth:10 } }
+                    labels:{ usePointStyle:true, boxWidth:6, boxHeight:6 } }
             }
         }
     });
@@ -523,3 +549,47 @@ async function loadSummary() {
     document.getElementById("kpiToday").textContent = j.today ?? "–";
 }
 loadSummary();
+
+
+document.getElementById('runPipelineBtn')
+        .addEventListener('click', async () => {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ …';
+    try {
+        const r = await fetch('/api/refresh', { method: 'POST' });
+        if (r.status === 202) {
+            alert('Пайплайн запущен! Обновите страницу через пару минут.');
+        } else {
+            const j = await r.json();
+            alert('Ошибка: ' + (j.message || r.status));
+        }
+    } catch (e) {
+        alert('Не удалось связаться с сервером');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Рассчитать';
+    }
+});
+
+document.getElementById('download-report')
+        .addEventListener('click', () => {
+    // если нужно передавать текущие фильтры:
+    // const params = new URLSearchParams(activeFilters).toString();
+    // const url = `/api/download_csv?${params}`;
+
+    const url = '/api/download_csv';
+
+    fetch(url)
+        .then(r => r.blob())
+        .then(blob => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'events.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(link.href);
+        })
+        .catch(err => console.error('CSV download failed', err));
+});

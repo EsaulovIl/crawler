@@ -24,6 +24,11 @@ class It52Spider(scrapy.Spider):
         building = info.css('span[itemprop="name"]::text').get()
         return f"{address}, {building}" if address and building else address or building or ""
 
+    def get_url(self, info, response):
+        """Абсолютная ссылка на карточку мероприятия."""
+        rel_link = info.css("h2.event-header > a::attr(href)").get()
+        return response.urljoin(rel_link) if rel_link else response.url
+
     def get_description(self, info):
         description = info.css("div.event-description").get()
         description = re.sub(r'</?(br|p)[^>]*>', '\n', description)
@@ -49,8 +54,9 @@ class It52Spider(scrapy.Spider):
                 end_date=self.get_date(info),
                 location=self.get_location(info),
                 description=self.get_description(info),
-                url=response.url,
+                url=self.get_url(info, response),
                 organizer="Не указано",
                 event_type="Не указано",
-                event_format="Не указано"
+                event_format="Не указано",
+                tags=self.get_tags(info)
             )

@@ -6,6 +6,7 @@ from .llm_parser import (build_event_prompt,
                          llm_generate,
                          parse_llm_response)
 from .exceptions import LLMError
+from scrapy.exceptions import DropItem
 
 logger = logging.getLogger(__name__)
 
@@ -62,4 +63,30 @@ class LLMEventPipeline:
             return item
 
         data.setdefault("url", url)
+        data.setdefault("tags", "Не указано")
         return EventItem(**data)
+
+
+class DropIncompletePipeline:
+    """
+    Отбрасывает EventItem, у которых одно из критически важных полей
+    осталось «Не указано». Допускаем пропуски только для:
+      • event_type
+      • event_format
+      • organizer
+    """
+    # поля, которые **обязательно** должны быть заполнены
+    _required = ("title", "start_date", "end_date", "location", "description")
+
+    def process_item(self, item, spider):
+        # пропускаем всё, что не EventItem
+        if not isinstance(item, EventItem):
+            return item
+
+        # если хотя бы одно обязательное поле == "Не указано", то дропаем
+        if any(item.get(f) == "Не указано" for f in self._required):
+            raise DropItem(
+                f"[DropIncompletePipeline] Incomplete item, url={item.get('url')}"
+            )
+
+        return item

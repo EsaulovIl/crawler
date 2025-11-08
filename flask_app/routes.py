@@ -1,17 +1,82 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, make_response
+import logging
+import csv, io
 from sqlalchemy import func, extract, desc
 from datetime import date
 from .models import Event
+from concurrent.futures import ThreadPoolExecutor
+from crawler.crawl_pipeline import run_spiders_subprocess
 from . import db
 
 # Создаём Blueprint, чтобы потом его зарегистрировать в app.py
 bp = Blueprint('main', __name__)
+
+_executor = ThreadPoolExecutor(max_workers=1)
+
+SPIDERS = ["it52", "alleventsit", "itc2go"]
+
+pipe_logger = logging.getLogger("pipeline")
+
+
+def _log_future(fut):
+    exc = fut.exception()
+    if exc:
+        pipe_logger.exception("Background pipeline failed", exc_info=exc)
+    else:
+        pipe_logger.info("Pipeline finished OK")
+
+
+@bp.post("/api/refresh")
+def api_refresh():
+    """
+    Стартует полный пайплайн в фоне.
+    Отдаёт 202 — «принято».
+    """
+    _executor.submit(run_spiders_subprocess).add_done_callback(_log_future)
+    return jsonify({"status": "started"}), 202
+
+
+@bp.route("/api/download_csv")
+def download_csv():
+    """
+    Отдаёт CSV-файл со всеми колонками таблицы events.
+    При наличии query-параметров применяются те же
+    фильтры, что и для остальных API (reuse apply_filters).
+    """
+    # формируем запрос
+    query = apply_filters(db.session.query(Event))  # :contentReference[oaicite:0]{index=0}
+
+    # собираем CSV в память (можно заменить генератором для стриминга)
+    sio = io.StringIO()
+    writer = csv.writer(sio, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+
+    columns = (
+        "id", "title", "organizer",
+        "start_date", "end_date",
+        "event_type", "event_format",
+        "location", "description",
+        "url", "relevant", "summary",
+        "created_at",
+    )
+    writer.writerow(columns)
+
+    for ev in query.order_by(Event.id).all():
+        writer.writerow([getattr(ev, c) for c in columns])
+
+    # отдаём как attachment
+    resp = make_response(sio.getvalue())
+    resp.headers["Content-Disposition"] = "attachment; filename=events.csv"
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8-sig"  # BOM для Excel
+    return resp
 
 
 def apply_filters(query):
     """
     Накладывает на SQLAlchemy Query общие условия фильтрации из request.args.
     """
+    if request.args.get('show_all') not in ('1', 'true', 'yes'):
+        query = query.filter(Event.relevant == 1)
+
     sd = request.args.get('start_date')
     ed = request.args.get('end_date')
     if sd:
@@ -253,6 +318,7 @@ def list_organizers():
 def list_event_types():
     types = db.session.query(Event.event_type).distinct().order_by(Event.event_type).all()
     return jsonify([t.event_type for t in types])
+
 
 # Список форматов мероприятий
 @bp.route("/api/formats")

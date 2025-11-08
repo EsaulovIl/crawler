@@ -18,3 +18,4 @@ class EventItem(scrapy.Item):
     event_format = scrapy.Field()
     location = scrapy.Field()
     description = scrapy.Field()
+    tags = scrapy.Field()

@@ -41,15 +41,21 @@ class AllEventsIT(scrapy.Spider):
     def parse(self, response):
         base = "https://all-events.ru"
         for info in response.css("div.event_flex_item"):
+            rel_link = (
+                    info.css("div.btn_events a::attr(href)").get()  # кнопка «ПОДРОБНЕЕ»
+                    or info.css("div.event_order_1 a.event_name_new::attr(href)").get()  # заголовок
+            )
+            full_link = response.urljoin(rel_link) if rel_link else response.url
             item = EventItem(
                 title=self.get_title(info),
                 start_date=self.get_start_date(info),
                 end_date=self.get_end_date(info),
                 location=self.get_location(info),
-                url=response.url,
+                url=full_link,
                 organizer="Не указано",
                 event_type="Не указано",
-                event_format="Не указано"
+                event_format="Не указано",
+                tags=self.get_tags(info)
             )
             rel_link = info.css("div.btn_events a::attr(href)").get()
             if rel_link:
